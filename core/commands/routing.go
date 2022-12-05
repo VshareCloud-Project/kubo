@@ -386,7 +386,6 @@ Different key types can specify other 'best' rules.
 	Type: []byte{},
 }
 
-// TODO: refactor this one.
 var putValueRoutingCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Write a key/value pair to the routing system.",

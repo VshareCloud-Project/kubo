@@ -5,12 +5,17 @@ import (
 	"errors"
 
 	"github.com/ipfs/go-path"
+	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 )
 
 type RoutingAPI CoreAPI
 
 func (r *RoutingAPI) Get(ctx context.Context, key string) ([]byte, error) {
+	if !r.nd.IsOnline {
+		return nil, coreiface.ErrOffline
+	}
+
 	dhtKey, err := normalizeKey(key)
 	if err != nil {
 		return nil, err
@@ -20,6 +25,10 @@ func (r *RoutingAPI) Get(ctx context.Context, key string) ([]byte, error) {
 }
 
 func (r *RoutingAPI) Put(ctx context.Context, key string, value []byte) error {
+	if !r.nd.IsOnline {
+		return coreiface.ErrOffline
+	}
+
 	dhtKey, err := normalizeKey(key)
 	if err != nil {
 		return err
