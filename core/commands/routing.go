@@ -437,9 +437,15 @@ identified by QmFoo.
 			return err
 		}
 
-		res.Emit(fmt.Sprintf("%s added", req.Arguments[0]))
-		return nil
+		return res.Emit([]byte(fmt.Sprintf("%s added", req.Arguments[0])))
 	},
+	Encoders: cmds.EncoderMap{
+		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out []byte) error {
+			_, err := w.Write(out)
+			return err
+		}),
+	},
+	Type: []byte{},
 }
 
 type printFunc func(obj *routing.QueryEvent, out io.Writer, verbose bool) error
