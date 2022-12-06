@@ -26,6 +26,7 @@ import (
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	ipath "github.com/ipfs/interface-go-ipfs-core/path"
 	routing "github.com/libp2p/go-libp2p/core/routing"
+	mc "github.com/multiformats/go-multicodec"
 	prometheus "github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -417,9 +418,15 @@ func (i *gatewayHandler) getOrHeadHandler(w http.ResponseWriter, r *http.Request
 
 	// Support custom response formats passed via ?format or Accept HTTP header
 	switch responseFormat {
-	case "": // The implicit response format is UnixFS
-		logger.Debugw("serving unixfs", "path", contentPath)
-		i.serveUnixFS(r.Context(), w, r, resolvedPath, contentPath, begin, logger)
+	case "":
+		switch resolvedPath.Cid().Prefix().Codec {
+		case uint64(mc.Json), uint64(mc.DagJson), uint64(mc.Cbor), uint64(mc.DagCbor):
+			logger.Debugw("serving codec", "path", contentPath)
+			i.serveCodec(r.Context(), w, r, resolvedPath, contentPath, begin, responseFormat)
+		default:
+			logger.Debugw("serving unixfs", "path", contentPath)
+			i.serveUnixFS(r.Context(), w, r, resolvedPath, contentPath, begin, logger)
+		}
 		return
 	case "application/vnd.ipld.raw":
 		logger.Debugw("serving raw block", "path", contentPath)
@@ -433,6 +440,11 @@ func (i *gatewayHandler) getOrHeadHandler(w http.ResponseWriter, r *http.Request
 	case "application/x-tar":
 		logger.Debugw("serving tar file", "path", contentPath)
 		i.serveTAR(r.Context(), w, r, resolvedPath, contentPath, begin, logger)
+		return
+	case "application/json", "application/vnd.ipld.dag-json",
+		"application/cbor", "application/vnd.ipld.dag-cbor":
+		logger.Debugw("serving codec", "path", contentPath)
+		i.serveCodec(r.Context(), w, r, resolvedPath, contentPath, begin, responseFormat)
 		return
 	case "application/vnd.ipfs.ipns-record":
 		logger.Debugw("serving ipns record", "path", contentPath)
@@ -870,6 +882,14 @@ func customResponseFormat(r *http.Request) (mediaType string, params map[string]
 			return "application/vnd.ipld.car", nil, nil
 		case "tar":
 			return "application/x-tar", nil, nil
+		case "dag-json":
+			return "application/vnd.ipld.dag-json", nil, nil
+		case "json":
+			return "application/json", nil, nil
+		case "dag-cbor":
+			return "application/vnd.ipld.dag-cbor", nil, nil
+		case "cbor":
+			return "application/cbor", nil, nil
 		case "ipns-record":
 			return "application/vnd.ipfs.ipns-record", nil, nil
 		}
@@ -880,8 +900,10 @@ func customResponseFormat(r *http.Request) (mediaType string, params map[string]
 	for _, accept := range r.Header.Values("Accept") {
 		// respond to the very first ipld content type
 		if strings.HasPrefix(accept, "application/vnd.ipld") ||
-			strings.HasPrefix(accept, "application/vnd.ipfs") ||
-			strings.HasPrefix(accept, "application/x-tar") {
+			strings.HasPrefix(accept, "application/x-tar") ||
+			strings.HasPrefix(accept, "application/json") ||
+			strings.HasPrefix(accept, "application/cbor") ||
+			strings.HasPrefix(accept, "application/vnd.ipfs") {
 			mediatype, params, err := mime.ParseMediaType(accept)
 			if err != nil {
 				return "", nil, err
