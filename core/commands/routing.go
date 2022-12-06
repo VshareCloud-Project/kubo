@@ -432,7 +432,13 @@ identified by QmFoo.
 			return err
 		}
 
-		return api.Routing().Put(req.Context, req.Arguments[0], data)
+		err = api.Routing().Put(req.Context, req.Arguments[0], data)
+		if err != nil {
+			return err
+		}
+
+		res.Emit(fmt.Sprintf("%s added", req.Arguments[0]))
+		return nil
 	},
 }
 
